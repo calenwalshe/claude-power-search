@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import sqlite3
-from datetime import date, datetime
+from datetime import date, datetime, timezone
 from pathlib import Path
 from dataclasses import dataclass
 
@@ -55,7 +55,7 @@ class Tracker:
         self._db().execute(
             "INSERT INTO usage (ts, provider, intent, query, cost, tokens_in, tokens_out, elapsed_ms) "
             "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
-            (datetime.utcnow().isoformat(), provider, intent, query, cost, tokens_in, tokens_out, elapsed_ms),
+            (datetime.now(timezone.utc).isoformat(), provider, intent, query, cost, tokens_in, tokens_out, elapsed_ms),
         )
         self._db().commit()
 

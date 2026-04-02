@@ -39,3 +39,21 @@ class TestDetectIntent:
 
     def test_grounded_search_gemini(self):
         assert detect_intent("search with Gemini for recipes") == Intent.GROUNDED_SEARCH
+
+    def test_youtube_url_returns_video_intent(self):
+        assert detect_intent("https://www.youtube.com/watch?v=dQw4w9WgXcQ") == Intent.YOUTUBE_VIDEO
+
+    def test_youtube_short_url_returns_video_intent(self):
+        assert detect_intent("https://youtu.be/dQw4w9WgXcQ") == Intent.YOUTUBE_VIDEO
+
+    def test_youtube_shorts_url_returns_video_intent(self):
+        assert detect_intent("https://youtube.com/shorts/abc123") == Intent.YOUTUBE_VIDEO
+
+    def test_youtube_url_with_context_returns_video(self):
+        assert detect_intent("summarize https://www.youtube.com/watch?v=abc123") == Intent.YOUTUBE_VIDEO
+
+    def test_youtube_keyword_without_url_returns_search(self):
+        assert detect_intent("find youtube videos about rust") == Intent.YOUTUBE
+
+    def test_non_youtube_url_returns_read(self):
+        assert detect_intent("https://example.com/article") == Intent.READ_URL

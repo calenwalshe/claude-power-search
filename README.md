@@ -1,6 +1,6 @@
 # Power Search
 
-Unified search and AI router with cost tracking. One interface for 7 search/AI providers, with automatic routing and per-query cost logging.
+Unified search and AI router with cost tracking. One interface for 8 search/AI providers, with automatic routing and per-query cost logging.
 
 ## Providers
 
@@ -13,6 +13,7 @@ Unified search and AI router with cost tracking. One interface for 7 search/AI p
 | **Perplexity** | Deep research with citations | ~$0.01-0.03/query | `PPLX_API_KEY` |
 | **Gemini** | AI analysis + generation | ~$0.001/query | `GEMINI_API_KEY` |
 | **Gemini Grounded** | Google Search + AI synthesis | ~$0.036/query (1,500 free/day) | `GEMINI_API_KEY` |
+| **Gemini YouTube** | Video transcripts, summaries, analysis | ~$0.02-0.05/video (8 hrs free/day) | `GEMINI_API_KEY` |
 | **OpenAI GPT-4o** | Text generation, coding | ~$0.01-0.05/query | `OPENAI_API_KEY` |
 
 ## Install
@@ -58,6 +59,14 @@ result = search("explain quantum computing", provider="perplexity")
 # Read a URL
 result = search("https://example.com/article")
 
+# YouTube video — transcript, summary, or analysis
+result = search("https://www.youtube.com/watch?v=dQw4w9WgXcQ")  # auto-summarizes
+result = search("https://www.youtube.com/watch?v=abc123", mode="transcript")
+result = search("https://www.youtube.com/watch?v=abc123", mode="analyze")
+
+# YouTube search — finds videos and summarizes top results
+result = search("rust async tutorials", intent=Intent.YOUTUBE)
+
 # Check spending
 print(usage.today())         # $0.42 across 38 queries
 print(usage.by_provider())   # {"tavily": 0.12, "perplexity": 0.30}
@@ -80,6 +89,7 @@ power-search research "quantum computing breakthroughs 2026"
 power-search read https://example.com/article
 power-search scrape https://js-heavy-site.com
 power-search youtube "rust async tutorials"
+power-search video https://www.youtube.com/watch?v=abc123
 power-search google "current weather in Toronto"
 
 # Force provider
@@ -115,7 +125,8 @@ The router detects intent from your query and picks the best available provider:
 | `https://example.com` | Read URL | Jina → Firecrawl |
 | "scrape this JS page" | Scrape | Firecrawl → Jina |
 | "crawl the whole site" | Crawl | Crawl4AI → Firecrawl |
-| "search youtube for X" | YouTube | Tavily |
+| "search youtube for X" | YouTube | Gemini YouTube (search + summarize) |
+| `https://youtube.com/watch?v=...` | YouTube Video | Gemini YouTube (transcript/summary) |
 | "google this" | Grounded Search | Gemini Grounded |
 | "write a draft of X" | Generate | Gemini → GPT-4o |
 

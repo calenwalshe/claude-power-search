@@ -18,6 +18,7 @@ INTENT_MAP = {
     "scrape": Intent.SCRAPE_URL,
     "crawl": Intent.CRAWL_SITE,
     "youtube": Intent.YOUTUBE,
+    "video": Intent.YOUTUBE_VIDEO,
     "generate": Intent.GENERATE,
     "google": Intent.GROUNDED_SEARCH,
 }

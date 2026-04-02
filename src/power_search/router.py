@@ -12,6 +12,7 @@ from power_search.tracker import usage
 
 # Intent detection patterns
 URL_RE = re.compile(r"https?://\S+")
+YOUTUBE_URL_RE = re.compile(r"(?:youtube\.com/watch|youtu\.be/|youtube\.com/shorts/)")
 YOUTUBE_RE = re.compile(r"youtube|youtubers?|video", re.I)
 RESEARCH_RE = re.compile(
     r"research|citations?|cite|sources|latest|current events|recent news|deep dive",
@@ -29,7 +30,8 @@ ROUTING_TABLE: dict[Intent, list[str]] = {
     Intent.READ_URL: ["jina", "firecrawl"],
     Intent.SCRAPE_URL: ["firecrawl", "jina"],
     Intent.CRAWL_SITE: ["crawl4ai", "firecrawl"],
-    Intent.YOUTUBE: ["tavily"],
+    Intent.YOUTUBE: ["gemini_youtube", "tavily"],
+    Intent.YOUTUBE_VIDEO: ["gemini_youtube"],
     Intent.GENERATE: ["gemini", "openai"],
     Intent.GROUNDED_SEARCH: ["gemini_grounded"],
 }
@@ -41,7 +43,8 @@ CHEAPEST_TABLE: dict[Intent, list[str]] = {
     Intent.READ_URL: ["jina", "firecrawl"],
     Intent.SCRAPE_URL: ["jina", "firecrawl"],
     Intent.CRAWL_SITE: ["crawl4ai", "firecrawl"],
-    Intent.YOUTUBE: ["tavily"],
+    Intent.YOUTUBE: ["gemini_youtube", "tavily"],
+    Intent.YOUTUBE_VIDEO: ["gemini_youtube"],
     Intent.GENERATE: ["gemini", "openai"],
     Intent.GROUNDED_SEARCH: ["gemini_grounded"],
 }
@@ -53,7 +56,8 @@ QUALITY_TABLE: dict[Intent, list[str]] = {
     Intent.READ_URL: ["firecrawl", "jina"],
     Intent.SCRAPE_URL: ["firecrawl", "jina"],
     Intent.CRAWL_SITE: ["crawl4ai", "firecrawl"],
-    Intent.YOUTUBE: ["tavily"],
+    Intent.YOUTUBE: ["gemini_youtube", "tavily"],
+    Intent.YOUTUBE_VIDEO: ["gemini_youtube"],
     Intent.GENERATE: ["openai", "gemini"],
     Intent.GROUNDED_SEARCH: ["gemini_grounded"],
 }
@@ -63,6 +67,9 @@ def detect_intent(query: str) -> Intent:
     """Detect what the user wants from the query string."""
     has_url = bool(URL_RE.search(query))
 
+    # YouTube URL → direct video processing (before generic URL handling)
+    if has_url and YOUTUBE_URL_RE.search(query):
+        return Intent.YOUTUBE_VIDEO
     if has_url and CRAWL_RE.search(query):
         return Intent.CRAWL_SITE
     if has_url and SCRAPE_RE.search(query):

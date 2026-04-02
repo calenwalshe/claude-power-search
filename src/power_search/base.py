@@ -17,6 +17,7 @@ class Intent(Enum):
     SCRAPE_URL = "scrape_url"  # render + scrape a JS-heavy URL
     CRAWL_SITE = "crawl_site"  # multi-page site crawl
     YOUTUBE = "youtube"  # search YouTube videos
+    YOUTUBE_VIDEO = "youtube_video"  # transcript/summary of a specific video
     GENERATE = "generate"  # text generation / coding
     GROUNDED_SEARCH = "grounded_search"  # Google-grounded AI search
 

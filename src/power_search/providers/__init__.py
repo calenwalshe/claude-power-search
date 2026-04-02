@@ -9,6 +9,7 @@ from power_search.providers.crawl4ai_provider import Crawl4AIProvider
 from power_search.providers.perplexity import PerplexityProvider
 from power_search.providers.gemini import GeminiProvider, GeminiGroundedProvider
 from power_search.providers.openai_provider import OpenAIProvider
+from power_search.providers.youtube import GeminiYouTubeProvider
 
 ALL_PROVIDERS: list = [
     TavilyProvider(),
@@ -18,6 +19,7 @@ ALL_PROVIDERS: list = [
     PerplexityProvider(),
     GeminiProvider(),
     GeminiGroundedProvider(),
+    GeminiYouTubeProvider(),
     OpenAIProvider(),
 ]
 
