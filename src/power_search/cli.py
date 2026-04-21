@@ -24,6 +24,32 @@ INTENT_MAP = {
 }
 
 
+COMMANDS = {}  # populated below after function definitions
+
+
+def cmd_report() -> int:
+    """Print per-provider/intent success rates, latency, and cost (L0 telemetry report)."""
+    stats = usage.route_stats()
+    if not stats:
+        print("No telemetry events recorded yet. Run some queries first.")
+        return 0
+
+    col = "{:<22} {:<12} {:>7} {:>8} {:>10} {:>12} {:>12}"
+    print(col.format("Provider", "Intent", "Total", "Success", "Rate", "Latency(ms)", "Cost($)"))
+    print("-" * 90)
+    for s in stats:
+        print(col.format(
+            s["provider"],
+            s["intent"],
+            s["total"],
+            s["success"],
+            f"{s['success_rate']:.0%}",
+            f"{s['avg_latency_ms']:.0f}",
+            f"{s['total_cost']:.5f}",
+        ))
+    return 0
+
+
 def main(argv: list[str] | None = None):
     parser = argparse.ArgumentParser(
         prog="power-search",
@@ -45,11 +71,17 @@ def main(argv: list[str] | None = None):
     usage_p.add_argument("--recent", type=int, default=0, help="Show last N queries")
     usage_p.add_argument("--providers", action="store_true", help="Show cost by provider")
 
+    # Report command (L0 telemetry)
+    sub.add_parser("report", help="Show provider success rates and latency (L0 telemetry)")
+
     args = parser.parse_args(argv)
 
     if args.command == "usage":
         _handle_usage(args)
         return
+
+    if args.command == "report":
+        sys.exit(cmd_report())
 
     if args.command is None:
         parser.print_help()
@@ -98,6 +130,12 @@ def _handle_usage(args):
     summary = usage.total() if args.all else usage.today()
     print(summary)
 
+
+COMMANDS.update({
+    "query": main,
+    "usage": _handle_usage,
+    "report": cmd_report,
+})
 
 if __name__ == "__main__":
     main()

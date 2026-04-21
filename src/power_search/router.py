@@ -136,13 +136,15 @@ class Router:
 
         # Try each candidate in order
         last_error = None
+        tried: list[str] = []
         for name in candidates:
             p = self._providers.get(name)
             if p is None or not p.available():
                 continue
+            tried.append(name)
             try:
                 result = p.search(query, intent, **kwargs)
-                self._track(result)
+                self._track(result, candidates_tried=tried, fallback_count=len(tried) - 1)
                 return result
             except ProviderKeyError:
                 continue
@@ -150,11 +152,38 @@ class Router:
                 last_error = e
                 continue
 
+        # All candidates failed — record the error event
+        error_provider = tried[-1] if tried else "none"
+        usage.record_event(
+            provider=error_provider,
+            intent=intent.value,
+            query=query,
+            cost=0.0,
+            outcome="error",
+            candidates_tried=tried,
+            fallback_count=max(0, len(tried) - 1),
+            error_type=type(last_error).__name__ if last_error else "NoProviderError",
+        )
         if last_error:
             raise last_error
         raise NoProviderError(intent)
 
-    def _track(self, result: SearchResult):
+    def _track(self, result: SearchResult,
+               candidates_tried: list[str] | None = None,
+               fallback_count: int = 0):
+        usage.record_event(
+            provider=result.provider,
+            intent=result.intent.value,
+            query=result.query,
+            cost=result.cost,
+            outcome="success",
+            candidates_tried=candidates_tried or [result.provider],
+            fallback_count=fallback_count,
+            elapsed_ms=result.elapsed_ms,
+            tokens_in=result.tokens_in,
+            tokens_out=result.tokens_out,
+        )
+        # Keep legacy usage table populated for budget checks
         usage.record(
             provider=result.provider,
             intent=result.intent.value,
