@@ -6,6 +6,7 @@ import re
 from urllib.parse import urlparse
 
 from power_search.base import Intent, SearchResult
+from power_search.circuit_breaker import CircuitBreaker
 from power_search.config import get_config, ProviderKeyError
 from power_search.tracker import usage
 
@@ -91,6 +92,7 @@ class Router:
     def __init__(self):
         from power_search.providers import PROVIDER_MAP
         self._providers = PROVIDER_MAP
+        self._breaker = CircuitBreaker()
 
     def search(
         self,
@@ -138,17 +140,21 @@ class Router:
         last_error = None
         tried: list[str] = []
         for name in candidates:
+            if not self._breaker.call_allowed(name):
+                continue
             p = self._providers.get(name)
             if p is None or not p.available():
                 continue
             tried.append(name)
             try:
                 result = p.search(query, intent, **kwargs)
+                self._breaker.record_success(name)
                 self._track(result, candidates_tried=tried, fallback_count=len(tried) - 1)
                 return result
             except ProviderKeyError:
                 continue
             except Exception as e:
+                self._breaker.record_failure(name)
                 last_error = e
                 continue
 
