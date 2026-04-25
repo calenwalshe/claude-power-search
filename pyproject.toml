@@ -32,6 +32,7 @@ dev = ["pytest>=7.0", "pytest-asyncio>=0.21"]
 
 [project.scripts]
 power-search = "power_search.cli:main"
+power-search-gather = "power_search.gather_cli:main"
 
 [project.urls]
 Homepage = "https://github.com/calenwalshe/claude-power-search"
