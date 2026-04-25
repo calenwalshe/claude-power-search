@@ -36,6 +36,40 @@ class Tracker:
             self._conn = sqlite3.connect(str(db_path), check_same_thread=False)
             self._conn.row_factory = sqlite3.Row
             self._conn.executescript("""
+                CREATE TABLE IF NOT EXISTS gather_jobs (
+                    id TEXT PRIMARY KEY,
+                    query TEXT NOT NULL,
+                    context TEXT,
+                    status TEXT NOT NULL DEFAULT 'running',
+                    providers TEXT NOT NULL DEFAULT '[]',
+                    created_at TEXT NOT NULL,
+                    finished_at TEXT
+                );
+                CREATE TABLE IF NOT EXISTS gather_results (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    job_id TEXT NOT NULL,
+                    provider TEXT NOT NULL,
+                    mode TEXT,
+                    status TEXT NOT NULL,
+                    content TEXT,
+                    cost REAL DEFAULT 0.0,
+                    elapsed_ms INTEGER DEFAULT 0,
+                    score REAL,
+                    error TEXT,
+                    arrived_at TEXT NOT NULL,
+                    FOREIGN KEY (job_id) REFERENCES gather_jobs(id)
+                );
+                CREATE TABLE IF NOT EXISTS gather_integrations (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    job_id TEXT NOT NULL,
+                    sources_used TEXT NOT NULL DEFAULT '[]',
+                    sources_missing TEXT NOT NULL DEFAULT '[]',
+                    content TEXT NOT NULL,
+                    created_at TEXT NOT NULL,
+                    FOREIGN KEY (job_id) REFERENCES gather_jobs(id)
+                );
+                CREATE INDEX IF NOT EXISTS idx_gr_job ON gather_results(job_id);
+                CREATE INDEX IF NOT EXISTS idx_gi_job ON gather_integrations(job_id);
                 CREATE TABLE IF NOT EXISTS usage (
                     id INTEGER PRIMARY KEY AUTOINCREMENT,
                     ts TEXT NOT NULL,
@@ -221,6 +255,86 @@ class Tracker:
             total_queries=row[1],
             by_provider={r[0]: {"cost": r[1], "queries": r[2]} for r in providers},
         )
+
+
+    # --- Gather job store ---
+
+    def create_job(self, job_id: str, query: str, providers: list[str], context: Optional[str] = None):
+        self._db().execute(
+            "INSERT INTO gather_jobs (id, query, context, status, providers, created_at) VALUES (?,?,?,?,?,?)",
+            (job_id, query, context, "running", json.dumps(providers),
+             datetime.now(timezone.utc).isoformat()),
+        )
+        self._db().commit()
+
+    def write_result(self, job_id: str, provider: str, mode: Optional[str],
+                     status: str, content: Optional[str] = None,
+                     cost: float = 0.0, elapsed_ms: int = 0,
+                     score: Optional[float] = None, error: Optional[str] = None):
+        self._db().execute(
+            """INSERT INTO gather_results
+               (job_id, provider, mode, status, content, cost, elapsed_ms, score, error, arrived_at)
+               VALUES (?,?,?,?,?,?,?,?,?,?)""",
+            (job_id, provider, mode, status, content, cost, elapsed_ms, score, error,
+             datetime.now(timezone.utc).isoformat()),
+        )
+        self._db().commit()
+
+    def finish_job(self, job_id: str, status: str = "done"):
+        self._db().execute(
+            "UPDATE gather_jobs SET status=?, finished_at=? WHERE id=?",
+            (status, datetime.now(timezone.utc).isoformat(), job_id),
+        )
+        self._db().commit()
+
+    def get_job(self, job_id: str) -> Optional[dict]:
+        row = self._db().execute(
+            "SELECT * FROM gather_jobs WHERE id=?", (job_id,)
+        ).fetchone()
+        if not row:
+            return None
+        d = dict(row)
+        d["providers"] = json.loads(d.get("providers") or "[]")
+        return d
+
+    def get_results(self, job_id: str) -> list[dict]:
+        rows = self._db().execute(
+            "SELECT * FROM gather_results WHERE job_id=? ORDER BY arrived_at", (job_id,)
+        ).fetchall()
+        return [dict(r) for r in rows]
+
+    def write_integration(self, job_id: str, content: str,
+                          sources_used: list[str], sources_missing: list[str]):
+        self._db().execute(
+            """INSERT INTO gather_integrations (job_id, sources_used, sources_missing, content, created_at)
+               VALUES (?,?,?,?,?)""",
+            (job_id, json.dumps(sources_used), json.dumps(sources_missing), content,
+             datetime.now(timezone.utc).isoformat()),
+        )
+        self._db().commit()
+
+    def get_integrations(self, job_id: str) -> list[dict]:
+        rows = self._db().execute(
+            "SELECT * FROM gather_integrations WHERE job_id=? ORDER BY created_at", (job_id,)
+        ).fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            d["sources_used"] = json.loads(d.get("sources_used") or "[]")
+            d["sources_missing"] = json.loads(d.get("sources_missing") or "[]")
+            result.append(d)
+        return result
+
+    def list_jobs(self, limit: int = 20) -> list[dict]:
+        rows = self._db().execute(
+            "SELECT * FROM gather_jobs ORDER BY created_at DESC LIMIT ?", (limit,)
+        ).fetchall()
+        result = []
+        for r in rows:
+            d = dict(r)
+            d["providers"] = json.loads(d.get("providers") or "[]")
+            result.append(d)
+        return result
 
 
 # Module-level singleton
