@@ -126,4 +126,28 @@ def integrate(job_id: str, wait: bool = False, verbose: bool = True) -> str:
     if verbose:
         print(f"[integrate:{job_id}] done — {len(integrated)} chars", file=sys.stderr)
 
+    # Commit to depot
+    try:
+        import sys as _sys
+        _sys.path.insert(0, str(__import__("pathlib").Path.home() / "projects/agent-depot"))
+        from depot import depot
+        depot.commit(
+            type="gather",
+            title=f"{job['query'][:60]}",
+            content=integrated,
+            metadata={
+                "job_id": job_id,
+                "providers_used": sources_used,
+                "providers_missing": sources_missing,
+                "context": job.get("context") or "",
+            },
+            short_summary=(
+                f"*[gather]* {job['query'][:60]}\n"
+                f"Sources: {', '.join(sources_used)}\n"
+                f"Missing: {', '.join(sources_missing) or 'none'}"
+            ),
+        )
+    except Exception as e:
+        print(f"[integrate:{job_id}] depot commit failed: {e}", file=sys.stderr)
+
     return integrated
