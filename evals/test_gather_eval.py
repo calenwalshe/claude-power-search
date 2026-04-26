@@ -32,10 +32,13 @@ from power_search.tracker import Tracker
 
 @pytest.fixture
 def tmp_tracker(tmp_path):
-    """Fresh tracker backed by a temp SQLite db."""
+    """Fresh tracker backed by a temp SQLite db, patched into the usage singleton."""
     db = tmp_path / "test.db"
     configure(db_path=db)
-    return Tracker()
+    t = Tracker()
+    with patch("power_search.tracker.usage", t), \
+         patch("power_search.integrate.usage", t):
+        yield t
 
 
 @pytest.fixture
@@ -97,41 +100,50 @@ class TestJobLifecycle:
 # ── Dim 2: Worker harness ─────────────────────────────────────────────────────
 
 class TestWorkerHarness:
-    def test_crashing_worker_writes_error_not_kills_siblings(self, tmp_tracker, tmp_path):
-        """A provider that raises must write status=error; other workers must still complete."""
-        configure(db_path=tmp_path / "test2.db")
-        jid = "harness-test-01"
+    def test_crashing_worker_does_not_kill_siblings(self, tmp_path):
+        """A crashing worker must not prevent sibling workers from completing.
 
-        call_log = []
+        We verify this by patching router.search globally (not via context manager,
+        so the patch persists into background threads) and reading from the real
+        usage tracker after the job finishes.
+        """
+        from power_search.base import Intent, SearchResult
+        from power_search.tracker import Tracker
+        from power_search.config import configure
+
+        db = tmp_path / "harness.db"
+        configure(db_path=db)
+
+        import power_search.router as router_mod
+        orig = router_mod.search
 
         def fake_router_search(query, provider=None, **kwargs):
-            call_log.append(provider)
             if provider == "tavily":
                 raise RuntimeError("Simulated tavily crash")
-            from power_search.base import Intent, SearchResult
             return SearchResult(
                 content="good result from " + provider,
-                provider=provider,
-                cost=0.01,
-                intent=Intent.SEARCH,
-                query=query,
+                provider=provider, cost=0.01,
+                intent=Intent.SEARCH, query=query,
             )
 
-        with patch("power_search.router.search", fake_router_search):
+        router_mod.search = fake_router_search
+        try:
             from power_search.gather import start_gather, wait_for_job
-            jid = start_gather(
-                query="test query",
-                providers=["tavily", "gemini_grounded"],
-                verbose=False,
-            )
+            jid = start_gather("test query", ["tavily", "gemini_grounded"], verbose=False)
             wait_for_job(jid, timeout=30)
+        finally:
+            router_mod.search = orig
 
         tracker = Tracker()
         results = tracker.get_results(jid)
         statuses = {r["provider"]: r["status"] for r in results}
 
-        assert statuses.get("tavily") == "error"
-        assert statuses.get("gemini_grounded") == "done"
+        # The sibling must have completed even though tavily crashed
+        assert statuses.get("gemini_grounded") == "done", \
+            f"Sibling worker was blocked by crash. statuses={statuses}"
+        # Tavily crash must be recorded
+        assert statuses.get("tavily") == "error", \
+            f"Crash not recorded. statuses={statuses}"
 
     def test_error_result_captures_message(self, tmp_tracker, job_id):
         tmp_tracker.create_job(job_id, "q", ["tavily"])
@@ -207,7 +219,7 @@ class TestPartialIntegration:
 
         with patch("power_search.integrate.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="Great synthesis.", stderr="")
-            with patch("power_search.integrate.depot", MagicMock()):
+            with patch("power_search.integrate._depot", MagicMock()):
                 from power_search.integrate import integrate
                 integrate(jid, verbose=False)
 
@@ -225,7 +237,7 @@ class TestPartialIntegration:
 
         with patch("power_search.integrate.subprocess.run") as mock_run:
             mock_run.return_value = MagicMock(returncode=0, stdout="Synthesis v1.", stderr="")
-            with patch("power_search.integrate.depot", MagicMock()):
+            with patch("power_search.integrate._depot", MagicMock()):
                 from power_search.integrate import integrate
                 integrate(jid, verbose=False)
                 # Add another result and integrate again
@@ -332,7 +344,7 @@ SCORE: X/5
         tmp_tracker.finish_job(jid)
 
         # Run real integration (no mock)
-        with patch("power_search.integrate.depot", MagicMock()):
+        with patch("power_search.integrate._depot", MagicMock()):
             from power_search.integrate import integrate
             synthesis = integrate(jid, verbose=True)
 

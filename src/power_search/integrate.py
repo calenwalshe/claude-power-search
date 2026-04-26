@@ -6,9 +6,17 @@ import subprocess
 import sys
 import tempfile
 import os
+from pathlib import Path
 from typing import Optional
 
 from power_search.tracker import usage
+
+# Depot integration — optional, fails gracefully if not installed
+try:
+    sys.path.insert(0, str(Path.home() / "projects/agent-depot"))
+    from depot import depot as _depot
+except Exception:
+    _depot = None
 
 
 SYSTEM_PROMPT = """\
@@ -128,10 +136,8 @@ def integrate(job_id: str, wait: bool = False, verbose: bool = True) -> str:
 
     # Commit to depot
     try:
-        import sys as _sys
-        _sys.path.insert(0, str(__import__("pathlib").Path.home() / "projects/agent-depot"))
-        from depot import depot
-        depot.commit(
+        if _depot is not None:
+            _depot.commit(
             type="gather",
             title=f"{job['query'][:60]}",
             content=integrated,
