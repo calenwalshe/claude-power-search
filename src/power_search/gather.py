@@ -24,16 +24,17 @@ PROVIDER_META: dict[str, dict] = {
     "tavily":           {"timeout": 15,   "est": "2-8s",    "tier": "fast"},
     "jina":             {"timeout": 15,   "est": "2-6s",    "tier": "fast"},
     "firecrawl":        {"timeout": 30,   "est": "5-20s",   "tier": "medium"},
-    "chatgpt/instant":  {"timeout": 60,   "est": "15-25s",  "tier": "medium"},
-    "chatgpt/thinking": {"timeout": 180,  "est": "30-60s",  "tier": "slow"},
-    "chatgpt/pro":      {"timeout": 300,  "est": "45-90s",  "tier": "slow"},
+    "chatgpt/instant":  {"timeout": 60,   "est": "15-25s",  "tier": "medium"},  # GPT-5.3
+    "chatgpt/latest":   {"timeout": 60,   "est": "15-25s",  "tier": "medium"},  # auto flagship
+    "chatgpt/thinking": {"timeout": 180,  "est": "30-60s",  "tier": "slow"},    # GPT-5.5
+    "chatgpt/pro":      {"timeout": 300,  "est": "45-90s",  "tier": "slow"},    # GPT-5.5
     "chatgpt/deep_research": {"timeout": 1800, "est": "5-20min", "tier": "very_slow"},
     "gemini_cdp/flash":    {"timeout": 30,  "est": "5-10s",  "tier": "fast"},
     "gemini_cdp/thinking": {"timeout": 120, "est": "15-40s", "tier": "medium"},
     "gemini_cdp/pro":      {"timeout": 240, "est": "30-90s", "tier": "slow"},
 }
 
-CHROME_QUERY_URL = "http://localhost:8765/query"
+CHROME_QUERY_URL = "http://localhost:8766/query"
 
 
 @dataclass
